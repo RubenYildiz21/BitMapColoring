@@ -19,8 +19,7 @@ public class MapColoringDemo {
 			BufferedImage image;
 			image = Image.loadImage(filename);
 			System.out.println("\n>>> " + filename);
-			// System.out.println("Image size : " + image.getWidth() + "x" +
-			// image.getHeight());
+			System.out.println("Image size : " + image.getWidth() + "x" + image.getHeight() + "y");
 			DrawingPanel p = Image.displayImage(image, filename);
 
 			// 2. Color image
