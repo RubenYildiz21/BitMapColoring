@@ -50,12 +50,10 @@ public class MapColoring {
 		this.borderColor = borderColor;
 		this.pixelGraph = new SimpleGraph<>(DefaultEdge.class);
 		this.zoneGraph = new SimpleGraph<>(DefaultEdge.class);
-		this.componentMap = new HashMap<>();  // Initialisation de componentMap
+		this.componentMap = new HashMap<>();
 		createGraphFromImage();
 		identifyComponents();
 		createZoneGraph();
-		applyColoring();
-		verifyColoring();
 		applyColorsToImage();
 	}
 
@@ -65,14 +63,20 @@ public class MapColoring {
 	 * two adjacent areas have different colors.
 	 */
 	public void colorMap() {
-		if (zoneGraph == null || zoneGraph.vertexSet().isEmpty()) {
-			logger.info("No vertices to color in the graph.");
-			return;
+		int width = image.getWidth();
+		int height = image.getHeight();
+
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int vertexId = y * width + x;
+				Integer zoneId = findZoneId(vertexId);
+				if (zoneId != null && zoneColorMap.containsKey(zoneId)) {
+					int colorIndex = zoneColorMap.get(zoneId);
+					Color color = new Color(rgbColors[colorIndex % rgbColors.length]);
+					image.setRGB(x, y, color.getRGB());
+				}
+			}
 		}
-		DSaturColoring<Integer, DefaultEdge> coloringAlg = new DSaturColoring<>(zoneGraph);
-		Coloring<Integer> coloring = coloringAlg.getColoring();
-		Map<Integer, Integer> colorMap = coloring.getColors();
-		logger.info("Coloring result: " + colorMap);
 	}
 
 	/**
@@ -140,10 +144,10 @@ public class MapColoring {
 	private void createZoneGraph() {
 		for (Integer zone1 : componentMap.keySet()) {
 			for (Integer zone2 : componentMap.keySet()) {
-				if (!zone1.equals(zone2) && areComponentsAdjacent(componentMap.get(zone1), componentMap.get(zone2))) {
+				if (!zone1.equals(zone2) && areComponentsAdjacent(componentMap.get(zone1), componentMap.get(zone2), 4)) {
 					if (zoneGraph.containsVertex(zone1) && zoneGraph.containsVertex(zone2)) {
 						zoneGraph.addEdge(zone1, zone2);
-						logger.info("Edge successfully added between " + zone1 + " and " + zone2);
+						//logger.info("Edge successfully added between " + zone1 + " and " + zone2);
 					} else {
 						logger.warning("Attempted to add edge between non-existent vertices: " + zone1 + " and " + zone2);
 					}
@@ -153,57 +157,77 @@ public class MapColoring {
 	}
 
 
-	private boolean areComponentsAdjacent(Set<Integer> pixels1, Set<Integer> pixels2) {
+	private boolean areComponentsAdjacent(Set<Integer> pixels1, Set<Integer> pixels2, int maxDistance) {
 		int width = image.getWidth();
-		int height = image.getHeight();
-		int blackRGB = Color.BLACK.getRGB();
-		// Définir des variables pour stocker les extrémités de chaque composant
-		int x1Min = width, x1Max = 0, y1Min = height, y1Max = 0;
-		int x2Min = width, x2Max = 0, y2Min = height, y2Max = 0;
+		// Définir la couleur des frontières pour la détection
+		int borderColor = Color.WHITE.getRGB(); // Exemple : supposons que les frontières sont blanches
 
-		// Calculer les limites de chaque composant
+		// Utiliser un Map pour stocker les points de chaque zone par leur coordonnée x ou y pour faciliter les comparaisons
+		Map<Integer, List<Integer>> xCoords1 = new HashMap<>();
+		Map<Integer, List<Integer>> yCoords1 = new HashMap<>();
+		Map<Integer, List<Integer>> xCoords2 = new HashMap<>();
+		Map<Integer, List<Integer>> yCoords2 = new HashMap<>();
+
+		// Remplir les maps pour les deux ensembles de pixels
 		for (Integer p1 : pixels1) {
 			int x1 = p1 % width;
 			int y1 = p1 / width;
-			if (x1 < x1Min) x1Min = x1;
-			if (x1 > x1Max) x1Max = x1;
-			if (y1 < y1Min) y1Min = y1;
-			if (y1 > y1Max) y1Max = y1;
+			xCoords1.computeIfAbsent(x1, k -> new ArrayList<>()).add(y1);
+			yCoords1.computeIfAbsent(y1, k -> new ArrayList<>()).add(x1);
 		}
-
 		for (Integer p2 : pixels2) {
 			int x2 = p2 % width;
 			int y2 = p2 / width;
-			if (x2 < x2Min) x2Min = x2;
-			if (x2 > x2Max) x2Max = x2;
-			if (y2 < y2Min) y2Min = y2;
-			if (y2 > y2Max) y2Max = y2;
+			xCoords2.computeIfAbsent(x2, k -> new ArrayList<>()).add(y2);
+			yCoords2.computeIfAbsent(y2, k -> new ArrayList<>()).add(x2);
 		}
 
-		// Vérifier l'alignement horizontal ou vertical et la proximité des limites
-		return ((y1Min == y2Min && y1Max == y2Max && (Math.abs(x1Max - x2Min) <= 4 || Math.abs(x2Max - x1Min) <= 4))
-				|| (x1Min == x2Min && x1Max == x2Max && (Math.abs(y1Max - y2Min) <= 4 || Math.abs(y2Max - y1Min) <= 4)))
-				&& image.getRGB(x1Max, y1Min) != blackRGB && image.getRGB(x2Min, y2Min) != blackRGB;
+		// Vérifier l'adjacence verticale et horizontale avec un intervalle maximal
+		for (int x1 : xCoords1.keySet()) {
+			for (int x2 : xCoords2.keySet()) {
+				if (Math.abs(x1 - x2) <= maxDistance) {
+					for (int y1 : xCoords1.get(x1)) {
+						for (int y2 : xCoords2.get(x2)) {
+							if (Math.abs(y1 - y2) == 1 && image.getRGB(x1, Math.min(y1, y2)) == borderColor) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		for (int y1 : yCoords1.keySet()) {
+			for (int y2 : yCoords2.keySet()) {
+				if (Math.abs(y1 - y2) <= maxDistance) {
+					for (int x1 : yCoords1.get(y1)) {
+						for (int x2 : yCoords2.get(y2)) {
+							if (Math.abs(x1 - x2) == 1 && image.getRGB(Math.min(x1, x2), y1) == borderColor) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return false;
 	}
 
 
-	private void applyColoring() {
+	public void applyColorsToImage() {
 		if (zoneGraph.vertexSet().isEmpty()) {
 			logger.warning("Zone graph is empty, no coloring possible.");
 			return;
 		}
-
-		DSaturColoring<Integer, DefaultEdge> coloringAlg = new DSaturColoring<>(zoneGraph);
+		SaturationDegreeColoring<Integer, DefaultEdge> coloringAlg = new SaturationDegreeColoring<>(zoneGraph);
 		Coloring<Integer> coloring = coloringAlg.getColoring();
 		zoneColorMap = coloring.getColors();
-
 		if (zoneColorMap == null || zoneColorMap.isEmpty()) {
 			logger.warning("No colors were assigned to any zone.");
 			return;
 		}
 
-		// Log the coloring results
-		zoneColorMap.forEach((zone, color) -> logger.info(String.format("Zone %d colored with color %d", zone, color)));
 
 		// Additional check to ensure no adjacent zones share the same color
 		for (DefaultEdge edge : zoneGraph.edgeSet()) {
@@ -214,55 +238,18 @@ public class MapColoring {
 				// Implement a fallback or corrective action here
 			}
 		}
-	}
-
-
-
-
-	public void applyColorsToImage() {
-		int width = image.getWidth();
-		int height = image.getHeight();
-
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				int vertexId = y * width + x;
-				Integer zoneId = findZoneId(vertexId);
-				if (zoneId != null && zoneColorMap.containsKey(zoneId)) {
-					int colorIndex = zoneColorMap.get(zoneId);
-					Color color = new Color(rgbColors[colorIndex % rgbColors.length]);
-					image.setRGB(x, y, color.getRGB());
-				}
-			}
-		}
+		//logger.info("Coloring result: " + zoneColorMap);
 	}
 
 
 	private Integer findZoneId(int pixelId) {
 		for (Map.Entry<Integer, Set<Integer>> entry : componentMap.entrySet()) {
 			if (entry.getValue().contains(pixelId)) {
-				//logger.info("Pixel " + pixelId + " found in zone " + entry.getKey()); // Debugging info
 				return entry.getKey();
 			}
 		}
 		return null;
 	}
-
-	private void verifyColoring() {
-		boolean errorDetected = false;
-		for (DefaultEdge edge : zoneGraph.edgeSet()) {
-			Integer source = zoneGraph.getEdgeSource(edge);
-			Integer target = zoneGraph.getEdgeTarget(edge);
-			if (zoneColorMap.get(source).equals(zoneColorMap.get(target))) {
-				logger.severe(String.format("Error: Adjacent zones %d and %d have the same color %d", source, target, zoneColorMap.get(source)));
-				errorDetected = true;
-				// Vous pouvez ajouter ici une logique pour rectifier le problème
-			}
-		}
-		if (!errorDetected) {
-			logger.info("All adjacent zones have different colors. Coloring is correct.");
-		}
-	}
-
 
 
 }

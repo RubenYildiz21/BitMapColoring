@@ -63,7 +63,7 @@ public class DSaturColoring<V, E> implements VertexColoringAlgorithm<V> {
                 Set<Integer> adjacentColors = getAdjacentColors(vertex, colors);
                 int color = getSmallestAvailableColor(adjacentColors);
                 colors.put(vertex, color);
-                updateUsedColors(vertex, color, usedColors);
+                //updateUsedColors(vertex, color, usedColors);
                 logger.info(String.format("Vertex %s colored with %d using colors adjacent %s", vertex.toString(), color, adjacentColors.toString()));
             }
         }

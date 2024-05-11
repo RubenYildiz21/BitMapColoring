@@ -14,7 +14,9 @@ import graphics.Image;
 public class MapColoringDemo {
 
 	public static void main(String[] args) {
-		for (String filename : new String[] { "img/maps/small_map.png" }) {
+		for (String filename : new String[] { "img/maps/small_map.png", "img/maps/truchet_tiling.png",
+				"img/maps/three_colors_tiling.png", "img/maps/hat_monotile.png", "img/maps/USA_map.png",
+				"img/maps/conformally-regular-pentagonal-tiling.png"  }) {
 			// 1. Load image to color
 			BufferedImage image;
 			image = Image.loadImage(filename);
