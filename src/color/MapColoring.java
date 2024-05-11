@@ -55,6 +55,7 @@ public class MapColoring {
 		identifyComponents();
 		createZoneGraph();
 		applyColoring();
+		verifyColoring();
 		applyColorsToImage();
 	}
 
@@ -87,6 +88,10 @@ public class MapColoring {
 	 * @return the coloring of the adjacency graph
 	 */
 	public Coloring<Integer> getColoring() {
+		if (zoneColorMap.isEmpty()) {
+			logger.warning("No coloring available. Zone graph might be empty or improperly connected.");
+			return new VertexColoringAlgorithm.ColoringImpl<>(new HashMap<>(), 0);
+		}
 		return new VertexColoringAlgorithm.ColoringImpl<>(zoneColorMap, zoneColorMap.size());
 	}
 
@@ -148,7 +153,6 @@ public class MapColoring {
 	}
 
 
-
 	private boolean areComponentsAdjacent(Set<Integer> pixels1, Set<Integer> pixels2) {
 		int width = image.getWidth();
 		int height = image.getHeight();
@@ -175,6 +179,7 @@ public class MapColoring {
 			if (y2 < y2Min) y2Min = y2;
 			if (y2 > y2Max) y2Max = y2;
 		}
+
 		// Vérifier l'alignement horizontal ou vertical et la proximité des limites
 		return ((y1Min == y2Min && y1Max == y2Max && (Math.abs(x1Max - x2Min) <= 4 || Math.abs(x2Max - x1Min) <= 4))
 				|| (x1Min == x2Min && x1Max == x2Max && (Math.abs(y1Max - y2Min) <= 4 || Math.abs(y2Max - y1Min) <= 4)))
@@ -185,7 +190,6 @@ public class MapColoring {
 	private void applyColoring() {
 		if (zoneGraph.vertexSet().isEmpty()) {
 			logger.warning("Zone graph is empty, no coloring possible.");
-			zoneColorMap = new HashMap<>(); // Initialize map to prevent NullPointerException
 			return;
 		}
 
@@ -194,16 +198,24 @@ public class MapColoring {
 		zoneColorMap = coloring.getColors();
 
 		if (zoneColorMap == null || zoneColorMap.isEmpty()) {
-			logger.warning("No colors were assigned to any zone. Initializing empty map.");
-			zoneColorMap = new HashMap<>();
-			// Potentially fill with default values if necessary
-			for (Integer zone : zoneGraph.vertexSet()) {
-				zoneColorMap.put(zone, 0); // Assign a default color if none assigned
+			logger.warning("No colors were assigned to any zone.");
+			return;
+		}
+
+		// Log the coloring results
+		zoneColorMap.forEach((zone, color) -> logger.info(String.format("Zone %d colored with color %d", zone, color)));
+
+		// Additional check to ensure no adjacent zones share the same color
+		for (DefaultEdge edge : zoneGraph.edgeSet()) {
+			Integer source = zoneGraph.getEdgeSource(edge);
+			Integer target = zoneGraph.getEdgeTarget(edge);
+			if (zoneColorMap.get(source).equals(zoneColorMap.get(target))) {
+				logger.severe(String.format("Adjacent zones %d and %d have the same color %d", source, target, zoneColorMap.get(source)));
+				// Implement a fallback or corrective action here
 			}
-		}  else {
-			logger.info("Colors assigned to zones: " + zoneColorMap);
 		}
 	}
+
 
 
 
@@ -234,6 +246,23 @@ public class MapColoring {
 		}
 		return null;
 	}
+
+	private void verifyColoring() {
+		boolean errorDetected = false;
+		for (DefaultEdge edge : zoneGraph.edgeSet()) {
+			Integer source = zoneGraph.getEdgeSource(edge);
+			Integer target = zoneGraph.getEdgeTarget(edge);
+			if (zoneColorMap.get(source).equals(zoneColorMap.get(target))) {
+				logger.severe(String.format("Error: Adjacent zones %d and %d have the same color %d", source, target, zoneColorMap.get(source)));
+				errorDetected = true;
+				// Vous pouvez ajouter ici une logique pour rectifier le problème
+			}
+		}
+		if (!errorDetected) {
+			logger.info("All adjacent zones have different colors. Coloring is correct.");
+		}
+	}
+
 
 
 }

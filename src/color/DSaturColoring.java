@@ -1,6 +1,5 @@
 package color;
 
-import java.lang.System.Logger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
 
 import org.jgrapht.Graph;
 import org.jgrapht.alg.interfaces.VertexColoringAlgorithm;
@@ -22,7 +22,7 @@ import org.jgrapht.alg.interfaces.VertexColoringAlgorithm;
  *
  */
 public class DSaturColoring<V, E> implements VertexColoringAlgorithm<V> {
-	
+    private static final java.util.logging.Logger logger = Logger.getLogger(DSaturColoring.class.getName());
 	public final Graph<V, E> graph; 
 	
     /**
@@ -58,14 +58,15 @@ public class DSaturColoring<V, E> implements VertexColoringAlgorithm<V> {
 	    List<V> vertices = new ArrayList<>(graph.vertexSet());
 	    vertices.sort((v1, v2) -> graph.degreeOf(v2) - graph.degreeOf(v1));
 
-	    for (V vertex : vertices) {
-	        if (!colors.containsKey(vertex)) {
-	            Set<Integer> adjacentColors = getAdjacentColors(vertex, colors);
-	            int color = getSmallestAvailableColor(adjacentColors);
-	            colors.put(vertex, color);
-	            updateUsedColors(vertex, color, usedColors);
-	        }
-	    }
+        for (V vertex : vertices) {
+            if (!colors.containsKey(vertex)) {
+                Set<Integer> adjacentColors = getAdjacentColors(vertex, colors);
+                int color = getSmallestAvailableColor(adjacentColors);
+                colors.put(vertex, color);
+                updateUsedColors(vertex, color, usedColors);
+                logger.info(String.format("Vertex %s colored with %d using colors adjacent %s", vertex.toString(), color, adjacentColors.toString()));
+            }
+        }
 
 	    return new ColoringImpl<>(colors, Collections.max(colors.values()) + 1);
 	}
@@ -122,7 +123,9 @@ public class DSaturColoring<V, E> implements VertexColoringAlgorithm<V> {
 
             if (usedColors.containsKey(opposite)) {
                 usedColors.get(opposite).add(color);
+                logger.info(String.format("Updating used colors for vertex %s: added color %d", opposite.toString(), color));
             }
         }
     }
+
 }
